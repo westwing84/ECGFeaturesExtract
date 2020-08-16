@@ -57,12 +57,15 @@ featuresEachMin = np.where(np.isnan(featuresEachMin), 0, featuresEachMin)
 featuresEachMin = np.where(np.isinf(featuresEachMin), 0, featuresEachMin)
 normalizedFeatures = stats.zscore(featuresEachMin, 0)
 
-
-# plot
-normalizedFeatures_T = normalizedFeatures.T
+# save to csv
 title = ['Mean NNI', 'Number of NNI', 'SDNN', 'Mean NNI difference', 'RMSSD', 'SDSD', 'Mean heart rate',
          'Std of the heart rate series', 'Normalized powers of LF', 'Normalized powers of HF', 'LF/HF ratio',
          'Sample entropy', 'Lyapunov exponent']
+df = pd.DataFrame(normalizedFeatures, columns=title)
+df.to_csv(path_result)
+
+# plot
+normalizedFeatures_T = normalizedFeatures.T
 num_plot = 9
 if normalizedFeatures_T.shape[0] % num_plot == 0:
     num_figure = normalizedFeatures_T.shape[0] // num_plot
@@ -80,7 +83,4 @@ for i in range(num_figure):
         plt.title(title[num_plot*i+j])
     plt.tight_layout()
 plt.show()
-
-
-# np.savetxt(path_result, normalizedFeatures, delimiter=',')
 
