@@ -11,7 +11,7 @@ import matplotlib.pyplot as plt
 matplotlib.use('TkAgg')
 
 path = 'C:\\Users\\ShimaLab\\Documents\\nishihara\\data\\20200611\\ECG\\'
-path_ecgdata = path + '20200505_130107_379_HB_PW.csv'
+path_ecgdata = path + 'hb_data_sample.csv'
 path_result = path + 'result\\normalizedFeaturesECG.csv'
 
 data = pd.read_csv(path_ecgdata)
@@ -26,13 +26,11 @@ data["timestamp"] = data["timestamp"].apply(timeToInt)
 # normalize the data
 data["timestamp"] = data["timestamp"] - data.iloc[0].timestamp
 
-# group for every 1 minute
-# groups = data.groupby(data["timestamp"].values // 13.)
-
 # features extrator
 featuresExct = ECGFeatures(set.FS_ECG)
 featuresEachMin = []
-windowsize = 300
+time = []
+windowsize = 60
 slide = 5
 t0 = 0
 tf = windowsize
@@ -44,6 +42,7 @@ while tf <= data[-2:-1].timestamp.values[0]:
     freq_domain = featuresExct.extractFrequencyDomain(data['ecg'].values[idx0:idxf])
     nonlinear_domain = featuresExct.extractNonLinearDomain(data['ecg'].values[idx0:idxf])
     featuresEachMin.append(np.concatenate([time_domain, freq_domain, nonlinear_domain]))
+    time.append(np.average(data['timestamp'].values[idx0:idxf]))
     t0 += slide
     tf += slide
     if tf > data[-2:-1].timestamp.values[0]:
@@ -56,7 +55,6 @@ while tf <= data[-2:-1].timestamp.values[0]:
 # normalized features
 featuresEachMin = np.where(np.isnan(featuresEachMin), 0, featuresEachMin)
 featuresEachMin = np.where(np.isinf(featuresEachMin), 0, featuresEachMin)
-
 normalizedFeatures = stats.zscore(featuresEachMin, 0)
 
 
@@ -77,7 +75,8 @@ for i in range(num_figure):
         if num_plot*i+j >= normalizedFeatures_T.shape[0]:
             break
         plt.subplot(3, 3, j + 1)
-        plt.plot(normalizedFeatures_T[num_plot*i+j])
+        plt.plot(time, normalizedFeatures_T[num_plot*i+j])
+        plt.xlabel('Time [s]')
         plt.title(title[num_plot*i+j])
     plt.tight_layout()
 plt.show()
