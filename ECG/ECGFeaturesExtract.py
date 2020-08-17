@@ -27,6 +27,10 @@ data["timestamp"] = data["timestamp"].apply(timeToInt)
 data_EmotionTest['Time_Start'] = data_EmotionTest['Time_Start'].apply(timeToInt)
 data_EmotionTest['Time_End'] = data_EmotionTest['Time_End'].apply(timeToInt)
 
+data_valid = []
+for col in list(data_EmotionTest.columns):
+    data_valid.append(data.loc[(data['timestamp'] >= data_EmotionTest.at['Time_Start', col]) & (data['timestamp'] <= data_EmotionTest.at['Time_End', col])])
+
 # normalize the data
 data["timestamp"] = data["timestamp"] - data.iloc[0].timestamp
 
