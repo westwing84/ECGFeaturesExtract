@@ -10,11 +10,13 @@ import matplotlib.pyplot as plt
 
 matplotlib.use('TkAgg')
 
-path = 'C:\\Users\\ShimaLab\\Documents\\nishihara\\data\\20200611\\ECG\\'
-path_ecgdata = path + 'hb_data_sample.csv'
-path_result = path + 'result\\normalizedFeaturesECG.csv'
+path = 'C:\\Users\\ShimaLab\\Documents\\nishihara\\data\\20200611\\'
+path_ECGdata = path + 'ECG\\hb_data_sample.csv'
+path_EmotionTest = path + 'EmotionTest\\Tsubasa_M_2020_6_11_13_24_2_gameResults.csv'
+path_result = path + 'ECG\\result\\normalizedFeaturesECG.csv'
 
-data = pd.read_csv(path_ecgdata)
+data = pd.read_csv(path_ECGdata)
+data_EmotionTest = pd.read_csv(path_EmotionTest)
 # start = "2020-04-29 15:40:21"
 # end = "2020-04-29 15:54:56"
 #
@@ -22,11 +24,13 @@ data = pd.read_csv(path_ecgdata)
 
 # convert timestamp to int
 data["timestamp"] = data["timestamp"].apply(timeToInt)
+data_EmotionTest['Time_Start'] = data_EmotionTest['Time_Start'].apply(timeToInt)
+data_EmotionTest['Time_End'] = data_EmotionTest['Time_End'].apply(timeToInt)
 
 # normalize the data
 data["timestamp"] = data["timestamp"] - data.iloc[0].timestamp
 
-# features extrator
+# features extractor
 featuresExct = ECGFeatures(set.FS_ECG)
 featuresEachMin = []
 time = []
@@ -34,7 +38,6 @@ windowsize = 60
 slide = 5
 t0 = 0
 tf = windowsize
-
 idx0 = 0
 idxf = np.where(data['timestamp'].values // 1 == tf)[0][0]
 while tf <= data[-2:-1].timestamp.values[0]:
