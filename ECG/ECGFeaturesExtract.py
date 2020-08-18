@@ -28,41 +28,50 @@ data_EmotionTest['Time_Start'] = data_EmotionTest['Time_Start'].apply(timeToInt)
 data_EmotionTest['Time_End'] = data_EmotionTest['Time_End'].apply(timeToInt)
 
 data_valid = []
-for col in list(data_EmotionTest.columns):
-    data_valid.append(data.loc[(data['timestamp'] >= data_EmotionTest.at['Time_Start', col]) & (data['timestamp'] <= data_EmotionTest.at['Time_End', col])])
-
-# normalize the data
-data["timestamp"] = data["timestamp"] - data.iloc[0].timestamp
+for idx in list(data_EmotionTest.index):
+    data_valid.append(data.loc[(data['timestamp'] >= data_EmotionTest.at[idx, 'Time_Start']) & (data['timestamp'] <= data_EmotionTest.at[idx, 'Time_End'])])
 
 # features extractor
 featuresExct = ECGFeatures(set.FS_ECG)
-featuresEachMin = []
 time = []
+emotionTestResult = []
+normalizedFeatures = []
 windowsize = 60
 slide = 5
-t0 = 0
-tf = windowsize
-idx0 = 0
-idxf = np.where(data['timestamp'].values // 1 == tf)[0][0]
-while tf <= data[-2:-1].timestamp.values[0]:
-    time_domain = featuresExct.extractTimeDomain(data['ecg'].values[idx0:idxf])
-    freq_domain = featuresExct.extractFrequencyDomain(data['ecg'].values[idx0:idxf])
-    nonlinear_domain = featuresExct.extractNonLinearDomain(data['ecg'].values[idx0:idxf])
-    featuresEachMin.append(np.concatenate([time_domain, freq_domain, nonlinear_domain]))
-    time.append(np.average(data['timestamp'].values[idx0:idxf]))
-    t0 += slide
-    tf += slide
-    if tf > data[-2:-1].timestamp.values[0]:
-        break
-    else:
-        idx0 = np.where(data['timestamp'].values // 1 == t0)[0][0]
-        idxf = np.where(data['timestamp'].values // 1 == tf)[0][0]
+i = 0
 
+for df in data_valid:
+    # normalize the data
+    df['tiemstamp'] = df['timestamp'] - df.at[0, 'timestamp']
 
-# normalized features
-featuresEachMin = np.where(np.isnan(featuresEachMin), 0, featuresEachMin)
-featuresEachMin = np.where(np.isinf(featuresEachMin), 0, featuresEachMin)
-normalizedFeatures = stats.zscore(featuresEachMin, 0)
+    featuresEachMin = []
+    t0 = 0
+    tf = windowsize
+    idx0 = 0
+    idxf = np.where(df['timestamp'].values // 1 == tf)[0][0]
+    while tf <= df.iat[-1, 0]:
+        time_domain = featuresExct.extractTimeDomain(df['ecg'].values[idx0:idxf])
+        freq_domain = featuresExct.extractFrequencyDomain(df['ecg'].values[idx0:idxf])
+        nonlinear_domain = featuresExct.extractNonLinearDomain(df['ecg'].values[idx0:idxf])
+        emotionTestResult.append(data_EmotionTest.loc[i, 'Valence':'Emotion'].values)
+        featuresEachMin.append(np.concatenate([time_domain, freq_domain, nonlinear_domain]))
+        time.append(np.average(df['timestamp'].values[idx0:idxf]))
+        t0 += slide
+        tf += slide
+        if tf > df.iat[-1, 0]:
+            break
+        else:
+            idx0 = np.where(df['timestamp'].values // 1 == t0)[0][0]
+            idxf = np.where(df['timestamp'].values // 1 == tf)[0][0]
+
+    # normalized features
+    featuresEachMin = np.where(np.isnan(featuresEachMin), 0, featuresEachMin)
+    featuresEachMin = np.where(np.isinf(featuresEachMin), 0, featuresEachMin)
+    normalizedFeatures.append(stats.zscore(featuresEachMin, 0))
+
+    i += 1
+    
+normalizedFeatures = np.concatenate([normalizedFeatures, emotionTestResult], axis=1)
 
 # save to csv
 title = ['Mean NNI', 'Number of NNI', 'SDNN', 'Mean NNI difference', 'RMSSD', 'SDSD', 'Mean heart rate',
