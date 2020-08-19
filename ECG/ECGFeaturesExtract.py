@@ -10,10 +10,10 @@ import matplotlib.pyplot as plt
 
 matplotlib.use('TkAgg')
 
-path = 'C:\\Users\\ShimaLab\\Documents\\nishihara\\data\\20200611\\'
-path_ECGdata = path + 'ECG\\hb_data_sample.csv'
-path_EmotionTest = path + 'EmotionTest\\Tsubasa_M_2020_6_11_13_24_2_gameResults.csv'
-path_result = path + 'ECG\\result\\normalizedFeaturesECG.csv'
+path = 'C:\\Users\\ShimaLab\\Documents\\nishihara\\data\\20200709\\Komiya\\'
+path_ECGdata = path + '20200709_152213_165_HB_PW.csv'
+path_EmotionTest = path + 'Komiya_M_2020_7_9_15_22_44_gameResults.csv'
+path_result = path + 'result\\ECG\\normalizedFeaturesECG.csv'
 
 data = pd.read_csv(path_ECGdata)
 data_EmotionTest = pd.read_csv(path_EmotionTest)
@@ -23,13 +23,15 @@ data_EmotionTest = pd.read_csv(path_EmotionTest)
 # data = data.loc[(data.timestamp >= start) & (data.timestamp <= end)]
 
 # convert timestamp to int
-data["timestamp"] = data["timestamp"].apply(timeToInt)
-data_EmotionTest['Time_Start'] = data_EmotionTest['Time_Start'].apply(timeToInt)
-data_EmotionTest['Time_End'] = data_EmotionTest['Time_End'].apply(timeToInt)
+data.loc[:, 'timestamp'] = data.loc[:, 'timestamp'].apply(timeToInt)
+data_EmotionTest.loc[:, 'Time_Start'] = data_EmotionTest.loc[:, 'Time_Start'].apply(timeToInt)
+data_EmotionTest.loc[:, 'Time_End'] = data_EmotionTest.loc[:, 'Time_End'].apply(timeToInt)
 
 data_valid = []
 for idx in list(data_EmotionTest.index):
-    data_valid.append(data.loc[(data['timestamp'] >= data_EmotionTest.at[idx, 'Time_Start']) & (data['timestamp'] <= data_EmotionTest.at[idx, 'Time_End'])])
+    tmp = data.loc[(data.loc[:, 'timestamp'] >= data_EmotionTest.at[idx, 'Time_Start']) & (data.loc[:, 'timestamp'] <= data_EmotionTest.at[idx, 'Time_End'])]
+    if not tmp.empty:
+        data_valid.append(tmp)
 
 # features extractor
 featuresExct = ECGFeatures(set.FS_ECG)
@@ -41,8 +43,9 @@ slide = 5
 i = 0
 
 for df in data_valid:
+    print(i)
     # normalize the data
-    df['tiemstamp'] = df['timestamp'] - df.at[0, 'timestamp']
+    df.loc[:, 'timestamp'] = df.loc[:, 'timestamp'] - df.iat[0, 0]
 
     featuresEachMin = []
     t0 = 0
@@ -67,12 +70,14 @@ for df in data_valid:
     # normalized features
     featuresEachMin = np.where(np.isnan(featuresEachMin), 0, featuresEachMin)
     featuresEachMin = np.where(np.isinf(featuresEachMin), 0, featuresEachMin)
-    normalizedFeatures.append(stats.zscore(featuresEachMin, 0))
+    normalizedFeatures = np.append(normalizedFeatures, stats.zscore(featuresEachMin, 0), axis=0)
 
     i += 1
-    
-normalizedFeatures = np.concatenate([normalizedFeatures, emotionTestResult], axis=1)
 
+print(normalizedFeatures)
+normalizedFeatures = np.concatenate([normalizedFeatures, emotionTestResult])
+
+'''
 # save to csv
 title = ['Mean NNI', 'Number of NNI', 'SDNN', 'Mean NNI difference', 'RMSSD', 'SDSD', 'Mean heart rate',
          'Std of the heart rate series', 'Normalized powers of LF', 'Normalized powers of HF', 'LF/HF ratio',
@@ -99,4 +104,4 @@ for i in range(num_figure):
         plt.title(title[num_plot*i+j])
     plt.tight_layout()
 plt.show()
-
+'''
