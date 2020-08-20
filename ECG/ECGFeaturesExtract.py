@@ -10,10 +10,10 @@ import matplotlib.pyplot as plt
 
 matplotlib.use('TkAgg')
 
-path = 'C:\\Users\\ShimaLab\\Documents\\nishihara\\data\\20200709\\Komiya\\'
+path = 'C:\\Users\\ShimaLab\\Documents\\nishihara\\data\\20200709\\Komiyama\\'
 path_ECGdata = path + '20200709_152213_165_HB_PW.csv'
 path_EmotionTest = path + 'Komiya_M_2020_7_9_15_22_44_gameResults.csv'
-path_result = path + 'result\\ECG\\normalizedFeaturesECG.csv'
+path_results = path + 'results\\ECG\\'
 
 data = pd.read_csv(path_ECGdata)
 data_EmotionTest = pd.read_csv(path_EmotionTest)
@@ -28,80 +28,90 @@ data_EmotionTest.loc[:, 'Time_Start'] = data_EmotionTest.loc[:, 'Time_Start'].ap
 data_EmotionTest.loc[:, 'Time_End'] = data_EmotionTest.loc[:, 'Time_End'].apply(timeToInt)
 
 data_valid = []
-for idx in list(data_EmotionTest.index):
-    tmp = data.loc[(data.loc[:, 'timestamp'] >= data_EmotionTest.at[idx, 'Time_Start']) & (data.loc[:, 'timestamp'] <= data_EmotionTest.at[idx, 'Time_End'])]
+for i in list(data_EmotionTest.index):
+    tmp = data.loc[(data.loc[:, 'timestamp'] >= data_EmotionTest.at[i, 'Time_Start']) & (data.loc[:, 'timestamp'] <= data_EmotionTest.at[i, 'Time_End'])]
     if not tmp.empty:
         data_valid.append(tmp)
 
 # features extractor
 featuresExct = ECGFeatures(set.FS_ECG)
 time = []
-emotionTestResult = []
-normalizedFeatures = []
-windowsize = 60
-slide = 5
-i = 0
+emotionTestResult = pd.DataFrame(columns=["Idx", "Start", "End", "Valence", "Arousal", "Emotion", "Status"])
+ecgFeatures = []
+windowsize = 45
+slide = 18
+idx = 0
+itr = 0
 
 for df in data_valid:
-    print(i)
-    # normalize the data
-    df.loc[:, 'timestamp'] = df.loc[:, 'timestamp'] - df.iat[0, 0]
+    # normalize time data
+    normalizedTime = df.loc[:, 'timestamp'].values - df.iat[0, 0]
 
     featuresEachMin = []
     t0 = 0
     tf = windowsize
     idx0 = 0
-    idxf = np.where(df['timestamp'].values // 1 == tf)[0][0]
-    while tf <= df.iat[-1, 0]:
-        time_domain = featuresExct.extractTimeDomain(df['ecg'].values[idx0:idxf])
-        freq_domain = featuresExct.extractFrequencyDomain(df['ecg'].values[idx0:idxf])
-        nonlinear_domain = featuresExct.extractNonLinearDomain(df['ecg'].values[idx0:idxf])
-        emotionTestResult.append(data_EmotionTest.loc[i, 'Valence':'Emotion'].values)
-        featuresEachMin.append(np.concatenate([time_domain, freq_domain, nonlinear_domain]))
-        time.append(np.average(df['timestamp'].values[idx0:idxf]))
-        t0 += slide
-        tf += slide
-        if tf > df.iat[-1, 0]:
-            break
+    idxf = np.where(np.array([int(n) for n in normalizedTime]) == tf)[0][0]
+    while tf <= normalizedTime[-1]:
+        time_start = df.iat[idx0, 0]
+        time_end = df.iat[idxf, 0]
+        time_domain = featuresExct.extractTimeDomain(df.loc[:, 'ecg'].values[idx0:idxf])
+        freq_domain = featuresExct.extractFrequencyDomain(df.loc[:, 'ecg'].values[idx0:idxf])
+        nonlinear_domain = featuresExct.extractNonLinearDomain(df.loc[:, 'ecg'].values[idx0:idxf])
+        if time_domain.shape[0] != 0 and freq_domain.shape[0] != 0 and nonlinear_domain.shape[0] != 0:
+            featuresEachMin.append(np.concatenate([time_domain, freq_domain, nonlinear_domain]))
+            time.append(np.average(normalizedTime[idx0:idxf]))
+            t0 += slide
+            tf += slide
+            if tf > normalizedTime[-1]:
+                break
+            else:
+                idx0 = np.where(np.array([int(n) for n in normalizedTime]) == t0)[0][0]
+                idxf = np.where(np.array([int(n) for n in normalizedTime]) == tf)[0][0]
+            np.save(path_results + "ecg_" + str(idx) + ".npy", featuresEachMin)
+            status = 1
         else:
-            idx0 = np.where(df['timestamp'].values // 1 == t0)[0][0]
-            idxf = np.where(df['timestamp'].values // 1 == tf)[0][0]
+            status = 0
 
-    # normalized features
+        emotionTestResult = emotionTestResult.append(
+            {'Idx': idx, 'Start': time_start, 'End': time_end,
+             "Valence": data_EmotionTest.iat[itr, 4], "Arousal": data_EmotionTest.iat[itr, 5],
+             "Emotion": data_EmotionTest.iat[itr, 6], "Status": status}, ignore_index=True)
+        idx += 1
+
     featuresEachMin = np.where(np.isnan(featuresEachMin), 0, featuresEachMin)
     featuresEachMin = np.where(np.isinf(featuresEachMin), 0, featuresEachMin)
-    normalizedFeatures = np.append(normalizedFeatures, stats.zscore(featuresEachMin, 0), axis=0)
+    if itr == 0:
+        ecgFeatures = featuresEachMin
+    else:
+        ecgFeatures = np.concatenate([ecgFeatures, featuresEachMin])
 
-    i += 1
+    itr += 1
 
-print(normalizedFeatures)
-normalizedFeatures = np.concatenate([normalizedFeatures, emotionTestResult])
-
-'''
 # save to csv
-title = ['Mean NNI', 'Number of NNI', 'SDNN', 'Mean NNI difference', 'RMSSD', 'SDSD', 'Mean heart rate',
-         'Std of the heart rate series', 'Normalized powers of LF', 'Normalized powers of HF', 'LF/HF ratio',
-         'Sample entropy', 'Lyapunov exponent']
-df = pd.DataFrame(normalizedFeatures, columns=title)
-df.to_csv(path_result)
+emotionTestResult.to_csv(path + 'Komiyama_ECG.csv')
+
 
 # plot
-normalizedFeatures_T = normalizedFeatures.T
+title = ['Mean NNI', 'Number of NNI', 'SDNN', 'Mean NNI difference', 'RMSSD', 'SDSD', 'Mean heart rate',
+         'Std of the heart rate series', 'Normalized powers of LF', 'Normalized powers of HF', 'LF/HF ratio',
+         'Sample entropy', 'Lyapunov exponent', 'Valence', 'Arousal', 'Emotion']
+ecgFeatures_T = ecgFeatures.T
 num_plot = 9
-if normalizedFeatures_T.shape[0] % num_plot == 0:
-    num_figure = normalizedFeatures_T.shape[0] // num_plot
+if ecgFeatures_T.shape[0] % num_plot == 0:
+    num_figure = ecgFeatures_T.shape[0] // num_plot
 else:
-    num_figure = normalizedFeatures_T.shape[0] // num_plot + 1
+    num_figure = ecgFeatures_T.shape[0] // num_plot + 1
 
 for i in range(num_figure):
     plt.figure(figsize=(12, 9))
     for j in range(num_plot):
-        if num_plot*i+j >= normalizedFeatures_T.shape[0]:
+        if num_plot*i+j >= ecgFeatures_T.shape[0]:
             break
         plt.subplot(3, 3, j + 1)
-        plt.plot(time, normalizedFeatures_T[num_plot*i+j])
-        plt.xlabel('Time [s]')
+        plt.plot(ecgFeatures_T[num_plot*i+j])
+        # plt.xlabel('Time [s]')
         plt.title(title[num_plot*i+j])
     plt.tight_layout()
 plt.show()
-'''
+
